@@ -104,17 +104,41 @@ def delete_track(track_id):
             dbDesconectar(conexion)
 
 
-def get_track(track_id):  # noqa: E501
-    """Gets a track info by idtrack
+def get_track(track_id):
+    """Gets a track file directly (returns audio in base64)"""
+    # Verificar autenticación defensiva
+    authorized, error_response = check_auth(required_scopes=['read:tracks'])
+    if not authorized:
+        return error_response
+    
+    conexion = None
+    try:
+        conexion = dbConectar()
+        if not conexion:
+            return Error(code="500", message="Database connection failed"), 500
 
-     # noqa: E501
+        with conexion.cursor() as cur:
+            query = "SELECT track FROM tracks WHERE idtrack = %s"
+            cur.execute(query, [track_id])
+            row = cur.fetchone()
+        if not row:
+            return Error(code="404", message="Track not found"), 404
 
-    :param track_id: 
-    :type track_id: int
+        # Obtener los bytes del campo BYTEA
+        track_bytes = bytes(row[0])
+        # Codificar a base64 para devolver
+        track_base64 = base64.b64encode(track_bytes).decode('utf-8')
+        
+        track_obj = Track(idtrack=track_id, track=track_base64)
+        return track_obj, 200
 
-    :rtype: Track
-    """
-    return 'do some magic!'
+    except Exception as e:
+        print(f"Error al obtener track: {e}")
+        return Error(code="500", message="Database error"), 500
+
+    finally:
+        if conexion:
+            dbDesconectar(conexion)
 
 
 def update_track(body, track_id):
