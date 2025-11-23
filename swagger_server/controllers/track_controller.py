@@ -69,17 +69,39 @@ def add_track(body):
             dbDesconectar(conexion)
 
 
-def delete_track(track_id):  # noqa: E501
-    """Deletes a track.
+def delete_track(track_id):
+    """Deletes a track"""
+    # Verificar autenticación defensiva
+    authorized, error_response = check_auth(required_scopes=['write:tracks'])
+    if not authorized:
+        return error_response
+    
+    conexion = None
+    try:
+        conexion = dbConectar()
+        if not conexion:
+            return Error(code="500", message="Database connection failed"), 500
 
-     # noqa: E501
+        with conexion.cursor() as cur:
+            query = "DELETE FROM tracks WHERE idtrack = %s;"
+            cur.execute(query, [track_id])
+            if cur.rowcount == 0:
+                conexion.rollback()
+                return Error(code="404", message="Track not found"), 404
 
-    :param track_id: 
-    :type track_id: int
+            conexion.commit()
 
-    :rtype: None
-    """
-    return 'do some magic!'
+        return '', 204
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        print(f"Error al eliminar track: {e}")
+        return Error(code="500", message="Database error"), 500
+
+    finally:
+        if conexion:
+            dbDesconectar(conexion)
 
 
 def get_track(track_id):  # noqa: E501
